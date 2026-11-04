@@ -17,6 +17,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Check Repository Files
+        run: |
+          echo "Current working directory:"
+          pwd
+
+          echo "Repository files:"
+          ls -la
+
+          echo "Searching for Dockerfile:"
+          find . -maxdepth 2 -name Dockerfile -print
+
+          echo "Checking Dockerfile:"
+          test -f Dockerfile
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

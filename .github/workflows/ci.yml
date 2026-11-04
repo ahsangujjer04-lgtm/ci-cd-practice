@@ -1,81 +1,58 @@
-name: Node.js Docker CI Pipeline
+name: Docker CI Debug
 
 on:
   push:
     branches: [main]
 
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  test:
-    name: Test and Build Docker Image
-
+  debug:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Check Repository Files
+      - name: Identify Repository and Commit
         run: |
-          echo "Current working directory:"
+          echo "Repository:"
+          echo "$GITHUB_REPOSITORY"
+
+          echo "Commit:"
+          echo "$GITHUB_SHA"
+
+          echo "Working directory:"
           pwd
 
-          echo "Repository files:"
+      - name: Inspect All Repository Files
+        run: |
+          echo "Root directory:"
           ls -la
 
-          echo "Searching for Dockerfile:"
-          find . -maxdepth 2 -name Dockerfile -print
+          echo "Workflow files:"
+          find .github/workflows -maxdepth 1 -type f -print
 
-          echo "Checking Dockerfile:"
-          test -f Dockerfile
+          echo "Dockerfile search:"
+          find . -type f -iname '*dockerfile*' -print
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+          echo "Tracked Dockerfile:"
+          git ls-files | grep -i dockerfile || true
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Verify Dockerfile
+        run: |
+          if [ ! -f ./Dockerfile ]; then
+            echo "ERROR: Dockerfile is missing from repository root."
+            exit 1
+          fi
 
-      - name: Run Application Tests
-        run: npm test
+          echo "Dockerfile found."
+          wc -c ./Dockerfile
+          cat ./Dockerfile
 
       - name: Build Docker Image
         run: |
-          echo "Current directory:"
-          pwd
-
-          echo "Dockerfile details:"
-          ls -l Dockerfile
-          wc -c Dockerfile
-
-          echo "Building Docker image:"
-          docker build --no-cache -f ./Dockerfile -t ci-cd-practice:latest .
-
-      - name: Run Docker Container
-        run: docker run -d --name ci-cd-test -p 3000:3000 ci-cd-practice:latest
-
-      - name: Test Container API
-        run: |
-          ready=0
-
-          for i in {1..10}; do
-            if curl --fail http://localhost:3000/health; then
-              ready=1
-              break
-            fi
-
-            sleep 2
-          done
-
-          test "$ready" -eq 1
-
-          curl --fail http://localhost:3000/
-          curl --fail http://localhost:3000/health
-
-      - name: Display Container Logs
-        if: always()
-        run: docker logs ci-cd-test || true
+          docker build --no-cache \
+            --file "$GITHUB_WORKSPACE/Dockerfile" \
+            --tag ci-cd-practice:latest \
+            "$GITHUB_WORKSPACE"

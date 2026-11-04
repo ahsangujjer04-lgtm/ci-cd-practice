@@ -44,7 +44,16 @@ jobs:
         run: npm test
 
       - name: Build Docker Image
-        run: docker build -t ci-cd-practice:latest .
+        run: |
+          echo "Current directory:"
+          pwd
+
+          echo "Dockerfile details:"
+          ls -l Dockerfile
+          wc -c Dockerfile
+
+          echo "Building Docker image:"
+          docker build --no-cache -f ./Dockerfile -t ci-cd-practice:latest .
 
       - name: Run Docker Container
         run: docker run -d --name ci-cd-test -p 3000:3000 ci-cd-practice:latest

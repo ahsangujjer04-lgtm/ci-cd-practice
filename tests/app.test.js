@@ -1,18 +1,40 @@
-describe("CI/CD Application Tests", () => {
+const request = require("supertest");
 
-    test("Application should return correct message", () => {
+const app = require("../app");
 
-        const message = "Hello! CI/CD Pipeline Practice";
+describe("CI/CD Application API Tests", () => {
 
-        expect(message).toBe("Hello! CI/CD Pipeline Practice");
+    test("GET / should return correct application response", async () => {
+
+        const response = await request(app).get("/");
+
+        expect(response.statusCode).toBe(200);
+
+        expect(response.body).toEqual({
+            message: "Hello! CI/CD Pipeline Practice",
+            status: "Application is running successfully",
+            developer: "Ahsan"
+        });
 
     });
 
-    test("Health status should be healthy", () => {
+    test("GET /health should return healthy status", async () => {
 
-        const status = "healthy";
+        const response = await request(app).get("/health");
 
-        expect(status).toBe("healthy");
+        expect(response.statusCode).toBe(200);
+
+        expect(response.body).toEqual({
+            status: "healthy"
+        });
+
+    });
+
+    test("GET /invalid should return 404", async () => {
+
+        const response = await request(app).get("/invalid");
+
+        expect(response.statusCode).toBe(404);
 
     });
 

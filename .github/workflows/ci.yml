@@ -1,54 +1,46 @@
-name: Docker CI Debug
+name: Node.js Docker CI Pipeline
 
 on:
   push:
     branches: [main]
 
+  pull_request:
+    branches: [main]
+
   workflow_dispatch:
 
 jobs:
-  debug:
+  test:
+    name: Test and Build Docker Image
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Identify Repository and Commit
+      - name: Inspect Repository
         run: |
-          echo "Repository:"
-          echo "$GITHUB_REPOSITORY"
-
-          echo "Commit:"
-          echo "$GITHUB_SHA"
-
           echo "Working directory:"
           pwd
 
-      - name: Inspect All Repository Files
-        run: |
-          echo "Root directory:"
+          echo "Repository files:"
           ls -la
 
-          echo "Workflow files:"
-          find .github/workflows -maxdepth 1 -type f -print
+          echo "Dockerfile:"
+          ls -l "$GITHUB_WORKSPACE/Dockerfile"
+          wc -c "$GITHUB_WORKSPACE/Dockerfile"
 
-          echo "Dockerfile search:"
-          find . -type f -iname '*dockerfile*' -print
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
 
-          echo "Tracked Dockerfile:"
-          git ls-files | grep -i dockerfile || true
+      - name: Install Dependencies
+        run: npm ci
 
-      - name: Verify Dockerfile
-        run: |
-          if [ ! -f ./Dockerfile ]; then
-            echo "ERROR: Dockerfile is missing from repository root."
-            exit 1
-          fi
-
-          echo "Dockerfile found."
-          wc -c ./Dockerfile
-          cat ./Dockerfile
+      - name: Run Jest Tests
+        run: npm test
 
       - name: Build Docker Image
         run: |
@@ -56,3 +48,40 @@ jobs:
             --file "$GITHUB_WORKSPACE/Dockerfile" \
             --tag ci-cd-practice:latest \
             "$GITHUB_WORKSPACE"
+
+      - name: Run Docker Container
+        run: |
+          docker run -d \
+            --name ci-cd-test \
+            -p 3000:3000 \
+            ci-cd-practice:latest
+
+      - name: Test Container API
+        run: |
+          ready=0
+
+          for i in {1..15}; do
+            if curl --fail http://localhost:3000/health; then
+              ready=1
+              break
+            fi
+
+            echo "Waiting for application..."
+            sleep 2
+          done
+
+          test "$ready" -eq 1
+
+          echo "Testing homepage:"
+          curl --fail http://localhost:3000/
+
+          echo "Testing health endpoint:"
+          curl --fail http://localhost:3000/health
+
+      - name: Display Container Logs
+        if: always()
+        run: docker logs ci-cd-test || true
+
+      - name: Cleanup Docker Container
+        if: always()
+        run: docker rm -f ci-cd-test || true
